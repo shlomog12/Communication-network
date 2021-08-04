@@ -1,4 +1,6 @@
-
+/*
+Authors: Shlomo Glick, Dolev Abuhatzira
+*/
 #include <string>
 #include <cstring>
 #include <vector>
