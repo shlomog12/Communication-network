@@ -1,3 +1,6 @@
+/*
+Authors: Shlomo Glick, Dolev Abuhatzira
+*/
 #pragma once
 #include <cstring>
 #include <iostream>
