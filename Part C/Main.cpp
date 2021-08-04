@@ -1,4 +1,6 @@
-
+/*
+Authors: Shlomo Glick, Dolev Abuhatzira
+*/
 #include "Node.hpp"
 #include "select.hpp"
 #include <iostream>
