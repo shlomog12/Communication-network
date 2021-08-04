@@ -1,4 +1,6 @@
-
+/*
+Authors: Shlomo Glick, Dolev Abuhatzira
+*/
 #include<algorithm>
 #include<vector>
 #include<set>
