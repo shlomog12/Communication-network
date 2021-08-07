@@ -78,7 +78,7 @@ int main(){
 			break;
 		}
 
-		char clientIPAddrReadable[32] = { '\0' };
+		char clientIPAddrReadable[128] = { '\0' };
 		inet_ntop(AF_INET, &clientAddress.sin6_addr, clientIPAddrReadable, sizeof(clientIPAddrReadable));
 
 		//print details of the client/peer and the data received

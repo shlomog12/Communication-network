@@ -21,23 +21,6 @@ using namespace std;
 
 bool debugger = false;
 
-/****************** *******************TASKS *********************************************
- * PART C : 
- * v 1) find the shortest path using struct Path    
- * v 2) avoid from circles with counter on the struct , ask if the counter is equal to zero
- * v 3) implement the route function with fake send message or route message
- * v 4) implement traili with of ==== (length / 492)
- * v 5) arragne the ack and nack prints
- * v 6) check if we need help functions for reapeting code ****
- * PART A :
- * v 1) we need to know what is k*x
- * 2) save wireshar picap's
- * v 3) check if we need UDPPingerHeartBeat file or 2 files
- * PART B :
- * 1) save wireshark picap's for IPv4 and IPv6 (https://www.omnisecu.com/tcpip/ipv6/comparison-between-ipv4-header-and-ipv6-header.php)
- * 2) printscreen netstat -na
- * 3) we need to know what is the diffrent between IPv6 and IPv4 (headers)
-*****************************************************************************************/
 
 
 void Node :: waiting(){ // this method running on while loop
