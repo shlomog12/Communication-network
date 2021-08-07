@@ -7,8 +7,7 @@ Authors: Shlomo Glick, Dolev Abuhatzira
 #include <vector>
 #include <set>
 
-const unsigned int PAYLOADSIZE=492; 
-const unsigned int SIZE_OF_BUFFER=8*512*20; 
+const unsigned int PAYLOAD_SIZE=492; 
 const int ACK = 1;
 const int NACK = 2;
 const int CONNECT = 4;
@@ -18,7 +17,7 @@ const int SEND = 32;
 const int RELAY = 64; 
 const int fourBytes = 4;
 const int eightBytes = 8;
-const uint32_t size_of_data = PAYLOADSIZE - fourBytes; // doesnt include the first four bytes (msg_id)
+const uint32_t size_of_data = PAYLOAD_SIZE - fourBytes; // doesnt include the first four bytes (msg_id)
 
 
 struct Message {
@@ -29,7 +28,7 @@ struct Message {
         uint32_t destination_id;
         uint32_t trailing_num;
         uint32_t function_id;
-        char payload[PAYLOADSIZE]; 
+        char payload[PAYLOAD_SIZE]; 
 
         Message(){}; // default constructor
         

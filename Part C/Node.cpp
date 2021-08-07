@@ -17,27 +17,39 @@ Authors: Shlomo Glick, Dolev Abuhatzira
 #include "Node.hpp"
 #include "Message.hpp"
 #include <set>
+#include <string>
 using namespace std;
 
 bool debugger = false;
 
-
+string get_input(){
+        const int size = 10;
+	    char *buffer = (char*)malloc(size); // let's keep str pointing to beginning of string...
+        string input;
+	    fgets(buffer, size, stdin);
+        input.append(buffer);
+	    while(input[input.length()-1] != '\n'){ // if we got whole string, the last char will be '\n'
+            memset(buffer,0,size);
+		    fgets(buffer, size, stdin); // read the rest (hopefully) of the line into the new space
+            input.append(buffer);
+	    }
+        input.erase(remove(input.begin(),input.end(), '\n'), input.end());
+        return input;
+}
 
 void Node :: waiting(){ // this method running on while loop
-    char buffer[SIZE_OF_BUFFER];
-
     int file_descriptor = wait_for_input();
-    
     if (file_descriptor == 0) { // get input from stdin
-        fgets(buffer, SIZE_OF_BUFFER, stdin);
-        get_commands_from_user(buffer);
+        string input = get_input();
+        get_commands_from_user(input);
     }
     else if (file_descriptor == this->mysock) {
         int new_sock = accept(file_descriptor, NULL, NULL);
         if (new_sock < 0) perror("failed to accept");
         add_fd_to_monitoring(new_sock);
     }
-    else {
+    else { 
+        char buffer[sizeof(Message)];
         size_t len = recv(file_descriptor, buffer, sizeof(Message), 0);
          if (len == 0){
             disconnect(file_descriptor);
@@ -362,12 +374,13 @@ Node::Path_data Node::update_path(vector<uint> & new_path , vector<uint> & curre
     }
     return paths.at(prev_message_id);
 }
-const Node::commands Node::convert_to_enum(const string command){
+const Node::commands Node::convert_to_enum(string command){
+    
     if (command == "setid") return commands::e_setid;
     if (command == "connect") return commands::e_connect;
     if (command == "send") return commands::e_send;
     if (command == "route") return commands::e_route;
-    if (command == "peers\n") return commands::e_peers;
+    if (command == "peers") return commands::e_peers;
     return commands::e_err;
 }
 void Node::add_neighbour(uint32_t neighbour_id , int socket , int neighbour_port , char * neighbour_ip) {
