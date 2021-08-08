@@ -76,7 +76,7 @@ void Node :: waiting(){ // this method running on while loop
 }
 void Node::set_id(const string input_id){
     this->id = atoi(input_id.c_str());
-    Message::count_message_id = (this->id * 100); //every message id have unique key (id00)
+    Message::count_message_id = (this->id * 10000); //every message id have unique key (id00)
     cout << "ACK" << endl;
 }
 void Node::connect_from_user(const string input) {
