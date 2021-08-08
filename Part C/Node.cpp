@@ -21,22 +21,37 @@ Authors: Shlomo Glick, Dolev Abuhatzira
 using namespace std;
 
 bool debugger = false;
-
-string get_input(){
+namespace {
+    string get_input(){
         const int size = 10;
-	    char *buffer = (char*)malloc(size); // let's keep str pointing to beginning of string...
+        char *buffer = (char*)malloc(size); // let's keep str pointing to beginning of string...
         string input;
-	    fgets(buffer, size, stdin);
+        fgets(buffer, size, stdin);
         input.append(buffer);
-	    while(input[input.length()-1] != '\n'){ // if we got whole string, the last char will be '\n'
+        while(input[input.length()-1] != '\n'){ // if we got whole string, the last char will be '\n'
             memset(buffer,0,size);
-		    fgets(buffer, size, stdin); // read the rest (hopefully) of the line into the new space
+            fgets(buffer, size, stdin); // read the rest (hopefully) of the line into the new space
             input.append(buffer);
-	    }
+        }
         input.erase(remove(input.begin(),input.end(), '\n'), input.end());
         return input;
+    }
+    vector<string> split (const string command, const char c){
+        vector<string> choice;
+        stringstream command_stream(command);
+        string intermediate;
+        while (getline(command_stream, intermediate, c)) {
+            choice.push_back(intermediate);
+        }
+        return choice;
+    }
+    int create_socket(){
+        int sock = 0;
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock == -1) perror("failed to create a socket");
+        return sock;
+    }
 }
-
 void Node :: waiting(){ // this method running on while loop
     int file_descriptor = wait_for_input();
     if (file_descriptor == 0) { // get input from stdin
@@ -59,41 +74,22 @@ void Node :: waiting(){ // this method running on while loop
         get_message_from_nei(message, file_descriptor);
     }
 }
-vector<string> split (const string command, const char c){
-    vector<string> choice;
-    stringstream command_stream(command);
-    string intermediate;
-    while (getline(command_stream, intermediate, c)) {
-        choice.push_back(intermediate);
-    }
-    return choice;
-}
-int create_socket(){
-    int sock = 0;
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1) perror("failed to create a socket");
-    return sock;
-}
 void Node::set_id(const string input_id){
     this->id = atoi(input_id.c_str());
     Message::count_message_id = (this->id * 100); //every message id have unique key (id00)
     cout << "ACK" << endl;
 }
 void Node::connect_from_user(const string input) {
-
     vector<string> v = split(input, ':');
     const char* neighbour_ip = v.at(0).c_str();
     uint32_t neighbour_port = atoi(v.at(1).c_str());
-
     struct sockaddr_in neighbour;
     neighbour.sin_family = AF_INET;
     neighbour.sin_port = htons(neighbour_port);
     neighbour.sin_addr.s_addr = inet_addr(neighbour_ip);
     int neighbour_socket = create_socket();
-
     if (connect(neighbour_socket, (struct sockaddr*)& neighbour, sizeof(neighbour)) == -1) { cout <<"NACK" << endl; perror("connection failed");}
     add_fd_to_monitoring(neighbour_socket);
-
     Message connect_message = make_connect(this->id, 0);
     if (send(neighbour_socket, &connect_message, sizeof(Message), 0) < 0) {cout << "NACK" << endl; perror("failed send");}
     messages[connect_message.id] = connect_message;
@@ -125,7 +121,6 @@ void Node::get_commands_from_user(string input) {
 }
 void Node::get_message_from_nei(Message* message, int sock){
     int choice = message->function_id;
-
     switch (choice) {
     case ACK:
         if (is_valid()) ack_from_nei(message, sock);
@@ -155,39 +150,31 @@ void Node::get_message_from_nei(Message* message, int sock){
     }
 }
 void Node::connect_from_nei(Message* connect_message, int sock){
-
     struct sockaddr_in address;
     socklen_t addr_size = sizeof(struct sockaddr_in);
     int res = getpeername(sock, (struct sockaddr *)&address, &addr_size);
     uint32_t neighbour_port = ntohs(address.sin_port); // from internet to int order
     char *neighbour_ip = inet_ntoa(address.sin_addr);
     uint32_t neighbour_id = connect_message->source_id;
-
     add_neighbour(neighbour_id,sock,neighbour_port,neighbour_ip);
-
     cout << "CONNECT" << endl;
     cout << neighbour_id << endl;
-
     send_ack(connect_message, sock);
+    send_to_neighbors_change();
 }
 void Node::send_ack(Message* message, int socket){
     Message ack_message = make_ack(this->id, message->source_id, message->id);
     if (send(socket, &ack_message, sizeof(ack_message), 0) < 0)  perror("failed to send ack");
 }
 void Node::ack_from_nei(Message* ack, int socket){
-
     uint32_t neighbour_id = ack->source_id;
-    std::cout << "get ack from " << neighbour_id << endl;
-
     if (!is_neighbour(neighbour_id)){
-
         struct sockaddr_in address;
         socklen_t addr_size = sizeof(struct sockaddr_in);
         int res = getpeername(socket, (struct sockaddr *)&address, &addr_size);
         uint32_t neighbour_port = ntohs(address.sin_port); // from internet to int order
         char *neighbour_ip = inet_ntoa(address.sin_addr);
         add_neighbour(neighbour_id,socket,neighbour_port,neighbour_ip);
-      
     }
     cout << "ACK" << endl;
     cout << neighbour_id << endl;
@@ -208,9 +195,12 @@ void Node::send_from_user(const string id, const string data_length, const strin
         if (is_neighbour(dest_id)) {
             int neighbour_socket = get_socket(dest_id);
             if (send(neighbour_socket, &send_message, sizeof(Message), 0) < 0){cout << "NACK" << endl; perror("failed send");}
-        }
-        
+        } 
         else {
+            if (paths.count(dest_id) != 0){
+                build_relays(paths.at(dest_id), send_message);
+                return;
+            }
             set<int> visited;
             visited.insert(this->id);
             send_discovers(send_message,dest_id,visited);
@@ -219,9 +209,12 @@ void Node::send_from_user(const string id, const string data_length, const strin
     }
 }
 void Node::discover_from_nei(Message* discover_message, int sock) {
-    if (debugger) cout <<  "get discover from " << discover_message->source_id << endl; 
     uint32_t target = get_bytes_from(discover_message->payload,0,fourBytes);
-    // check if the target is negihbour
+    if (target == -1) this->paths = {};
+    if (debugger){
+         if (target == -1) cout <<  "get change from " << discover_message->source_id << endl; 
+         else cout <<  "get discover from " << discover_message->source_id << endl;
+    }  
     if (is_neighbour(target)) {
         vector<uint> path {target,this->id};
         send_route(*discover_message,path);
@@ -233,25 +226,24 @@ void Node::discover_from_nei(Message* discover_message, int sock) {
     send_discovers(*discover_message,target , visited);
 }
 void Node::send_discovers(Message comming_message, uint32_t target,set<int> & visited) {
-
-    Path_data current_data {INT_MAX,{},0};   
-    paths[comming_message.id] = current_data; 
-
+    requests[comming_message.id] = 0; 
+    paths = {};
     for (auto runner : connections) {
-
         Neighbour neighbour = runner.second;
         if (visited.count(neighbour.id)) continue;
-        paths.at(comming_message.id).requests ++;
+        requests.at(comming_message.id) ++;
         int neighbour_socket = get_socket(neighbour.id);
-        Message discover_message = make_discover(this->id, neighbour.id, target, visited, visited.size()); 
-        if (debugger) cout <<  "send discover to " << neighbour.id << endl; 
+        Message discover_message = make_discover(this->id, neighbour.id, target, visited, visited.size());
+        if (debugger){
+            if (target == -1) cout <<  "send change to " << neighbour.id << endl;
+            else cout <<  "send discover to " << neighbour.id << endl;
+        }
+
         if (send(neighbour_socket, &discover_message, sizeof(Message), 0) < 0) {cout << "NACK" << endl; perror("failed send");};
-
         messages[discover_message.id] = comming_message;
-
     }
-
-    if (paths[comming_message.id].requests == 0) { // its means that the current node is a leaf
+    if (requests[comming_message.id] == 0) { // its means that the current node is a leaf
+        if (comming_message.source_id == this->id) return;
         int neighbour_socket = connections.at(comming_message.source_id).socket;
         send_nack(comming_message.source_id,comming_message.id,neighbour_socket);
     }
@@ -260,20 +252,18 @@ void Node::route_from_nei(Message* route_msg, int socket){
     if (debugger) cout <<  "get route from " << route_msg->source_id << endl; 
     uint32_t out_message_id = get_bytes_from(route_msg->payload, 0, fourBytes);    
     Message prev_message = messages[out_message_id]; //extract the previous discover message
-
     vector<uint> path_from_nei = get_path_from_payload (route_msg->payload);
     path_from_nei.push_back(this->id);
-
     vector<uint> current_path = get_current_path (prev_message.id); 
-
-    Path_data current_data = update_path (path_from_nei ,current_path, prev_message.id);
- 
-    if (current_data.requests == 0) {
+    current_path = update_path (path_from_nei ,current_path, prev_message.id);
+    uint32_t target = current_path[0];
+    paths[target] = current_path;
+    if (requests[prev_message.id] == 0) {
         if (prev_message.source_id == this->id) {
-                if (prev_message.get_type() == SEND) build_relays(current_data.path, prev_message);
-                if (prev_message.get_type() == ROUTE) print_path(current_data.path);
+                if (prev_message.get_type() == SEND) build_relays(current_path, prev_message);
+                if (prev_message.get_type() == ROUTE) print_path(current_path);
         }
-        else send_route(prev_message,current_data.path);
+        else send_route(prev_message,current_path);
     }
 }
 void Node::build_relays(vector<uint> & path, Message last_message) {
@@ -313,7 +303,7 @@ void Node::relay_from_nei(Message* message, int socket){
         }
     }
 }
-void Node:: send_route(Message discover_in_msg, vector<uint> & path){
+void Node::send_route(Message discover_in_msg, vector<uint> & path){
     if (debugger) cout <<  "send route to " << discover_in_msg.source_id << endl; 
     Message route_message = make_route (this->id,discover_in_msg.source_id,discover_in_msg.id,path.size(),path);
     int neighbour_socket = get_socket(discover_in_msg.source_id);
@@ -323,8 +313,11 @@ void Node:: send_route(Message discover_in_msg, vector<uint> & path){
 void Node::print_route_to_node_id(const string id){
     uint32_t dest_id = atoi(id.c_str());
     if (this->id == dest_id) {cout << this->id << endl; return;}
-
     if(is_neighbour(dest_id)) {std::cout << this->id << "->" << dest_id << std::endl; return;}
+    if (paths.count(dest_id)){
+        print_path(paths[dest_id]);
+        return;
+    }
     vector<uint> path = {};
     Message route_message = make_route(this->id, dest_id, -1, 0, path);
     set<int> visited;
@@ -344,38 +337,38 @@ void Node::send_nack(uint32_t dest_id,uint32_t msg_id,int neighbour_socket){
 }
 void Node::nack_from_nei(Message* nack) {
     uint32_t neighbour_id = nack->source_id;
-    cout << "NACK" << endl;
-    cout << neighbour_id << endl;
-    uint32_t out_message_id = get_bytes_from(nack->payload, 0, fourBytes);    
+    uint32_t out_message_id = get_bytes_from(nack->payload, 0, fourBytes);  
     Message prev_message = messages[out_message_id];
-    paths.at(prev_message.id).requests --;
-
-    if (paths.at(prev_message.id).requests == 0) {
-        if(paths.at(prev_message.id).path_length == INT_MAX) {
+    uint32_t target = get_bytes_from(prev_message.payload, 0, fourBytes);
+    if (target != -1 && prev_message.id !=-1){
+        cout << "NACK" << endl;
+        cout << neighbour_id << endl;
+    }
+    requests.at(prev_message.id)--;
+    if (requests.at(prev_message.id) == 0) {
+        if(paths.count(prev_message.id) == 0) {
             if (this->id == prev_message.source_id) return;
             int neighbour_socket = connections.at(prev_message.source_id).socket;
             send_nack(prev_message.source_id,prev_message.id,neighbour_socket);
         }
         else {
-            send_route(prev_message,paths.at(prev_message.id).path);
+            send_route(prev_message,paths.at(prev_message.id));
         }
     }
 }
-Node::Path_data Node::update_path(vector<uint> & new_path , vector<uint> & current_path, uint32_t prev_message_id) {
-    paths[prev_message_id].requests --;
-    
+vector<uint> Node::update_path(vector<uint> & new_path , vector<uint> & current_path, uint32_t prev_message_id) {
+    requests[prev_message_id] --;
     if (current_path.size() == 0 || new_path.size() < current_path.size()) {    
-        paths.at(prev_message_id).path = new_path;
+        paths.at(prev_message_id) = new_path;
         return paths.at(prev_message_id);
     }
     if (current_path.size() == new_path.size() && std::lexicographical_compare(new_path.begin(),new_path.end(),current_path.begin(),current_path.end())) {
-        paths[prev_message_id].path = new_path;
+        paths[prev_message_id] = new_path;
         return paths.at(prev_message_id);
     }
     return paths.at(prev_message_id);
 }
 const Node::commands Node::convert_to_enum(string command){
-    
     if (command == "setid") return commands::e_setid;
     if (command == "connect") return commands::e_connect;
     if (command == "send") return commands::e_send;
@@ -406,17 +399,23 @@ void Node::print_neighbours(){
     cout << endl;
 }
 void Node::disconnect(int file_descriptor){
-
     int id=-1;
     for(auto n:connections){
-        if (n.second.socket == file_descriptor){
-            id =n.second.id;
-        }
+        if (n.second.socket == file_descriptor) id =n.second.id;
     }
     if (debugger) cout << id << " disconnect" << endl; 
     this->connections.erase(id);
     remove_fd_from_monitoring(file_descriptor);
+    send_to_neighbors_change();
 }
-
+void Node::send_to_neighbors_change(){
+    this->paths = {};
+    set<int> visited;
+    visited.insert(this->id);
+    Message m;
+    m.source_id = this->id;
+    m.id = -1;
+    send_discovers(m, -1,visited);
+}
 // setid,1
 // connect,127.0.0.1:2002

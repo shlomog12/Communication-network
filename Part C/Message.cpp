@@ -1,5 +1,5 @@
 /*
-Authors: Shlomo Glick, Dolev Abuhatzira
+  Authors: Shlomo Glick, Dolev Abuhatzira
 */
 #include <string>
 #include <cstring>
@@ -43,7 +43,6 @@ Message make_route(uint32_t source_id, uint32_t dest_id, uint32_t message_id ,ui
   std::copy(path.begin(), path.end(), route_message.payload + eightBytes);
   return route_message;
 }
-
 Message make_relay(uint32_t source_id, uint32_t dest_id, uint32_t next, uint32_t length) {
   Message relay_message(source_id, dest_id, RELAY);
   relay_message.trailing_num = length;
@@ -51,15 +50,13 @@ Message make_relay(uint32_t source_id, uint32_t dest_id, uint32_t next, uint32_t
   memcpy(relay_message.payload + fourBytes, &length, fourBytes);
   return relay_message;
 }
-
 int get_bytes_from (char * payload ,int start , int size) {
   int res;
   memcpy(&res,payload + start ,size);
   return res;
-} 
-
+}
 std::vector <uint> get_path_from_payload (char* payload) {
-        int path_length = get_bytes_from (payload,fourBytes,fourBytes);
-        std::vector<uint> path (payload + eightBytes,payload + eightBytes + path_length);
-         return path;
+    int path_length = get_bytes_from (payload,fourBytes,fourBytes);
+    std::vector<uint> path (payload + eightBytes,payload + eightBytes + path_length);
+    return path;
 }

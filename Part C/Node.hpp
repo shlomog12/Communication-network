@@ -35,7 +35,9 @@ class Node {
         int mysock;
         std::map <uint32_t ,struct Neighbour> connections;
         std::map <int , std:: queue <Message> > relays;
-        std::map <int ,struct Path_data> paths;
+        // std::map <int ,struct Path_data> paths;
+        std::map <int ,std::vector<uint>> paths;    // <target,path>
+        std::map <int ,int> requests;              //  <msg_id,counter>
         std::map <int ,struct Message> messages;
 
         const commands convert_to_enum(const std::string command);
@@ -48,7 +50,7 @@ class Node {
         void print_neighbours();
         void send_ack(Message* message,int sock);
         void send_discovers(Message dis_msg, uint32_t target,std::set<int> & visited);
-        Path_data update_path (std::vector<uint> & new_path , std::vector<uint> & current_path, uint32_t prev_message_id);
+        std::vector<uint> update_path (std::vector<uint> & new_path , std::vector<uint> & current_path, uint32_t prev_message_id);
         void build_relays(std::vector<uint> & path, Message last_message);
         void send_route (Message discover_in_msg, std::vector<uint> & path);
         void print_path( std::vector<uint> & path);
@@ -66,7 +68,8 @@ class Node {
         bool have_neighbours();
         bool is_neighbour(int id);
         int & get_socket(int id);
-        std::vector<uint> & get_current_path(int discover_message_id) {return this->paths[discover_message_id].path;}
+        void send_to_neighbors_change();
+        std::vector<uint> & get_current_path(int discover_message_id) {return this->paths[discover_message_id];}
         void add_neighbour(uint32_t neighbour_id , int socket , int neighbour_port , char* ip);
         bool is_valid () {
             if (this->id == -1) { std::cout << "please insert id first" << std::endl; return false; }
